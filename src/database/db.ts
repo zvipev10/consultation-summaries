@@ -29,7 +29,8 @@ export async function initializeDatabase() {
   if (initializePromise) return initializePromise;
 
   initializePromise = (async () => {
-    await getSql().query(`
+    const statements = [
+      `
       CREATE TABLE IF NOT EXISTS customers (
         id BIGSERIAL PRIMARY KEY,
         "fullName" TEXT NOT NULL,
@@ -38,23 +39,23 @@ export async function initializeDatabase() {
         "externalCustomerId" TEXT,
         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
+      )`,
 
-      CREATE UNIQUE INDEX IF NOT EXISTS customers_normalized_phone_unique
+      `CREATE UNIQUE INDEX IF NOT EXISTS customers_normalized_phone_unique
         ON customers ("normalizedPhone")
-        WHERE "normalizedPhone" IS NOT NULL;
+        WHERE "normalizedPhone" IS NOT NULL`,
 
-      CREATE UNIQUE INDEX IF NOT EXISTS customers_external_customer_id_unique
+      `CREATE UNIQUE INDEX IF NOT EXISTS customers_external_customer_id_unique
         ON customers ("externalCustomerId")
-        WHERE "externalCustomerId" IS NOT NULL;
+        WHERE "externalCustomerId" IS NOT NULL`,
 
-      CREATE INDEX IF NOT EXISTS customers_name_lower_idx
-        ON customers (LOWER("fullName"));
+      `CREATE INDEX IF NOT EXISTS customers_name_lower_idx
+        ON customers (LOWER("fullName"))`,
 
-      CREATE INDEX IF NOT EXISTS customers_email_lower_idx
-        ON customers (LOWER(email));
+      `CREATE INDEX IF NOT EXISTS customers_email_lower_idx
+        ON customers (LOWER(email))`,
 
-      CREATE TABLE IF NOT EXISTS consultations (
+      `CREATE TABLE IF NOT EXISTS consultations (
         id BIGSERIAL PRIMARY KEY,
         "customerId" BIGINT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
         summary TEXT NOT NULL,
@@ -63,15 +64,15 @@ export async function initializeDatabase() {
         "revisionCount" INTEGER NOT NULL DEFAULT 1,
         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
+      )`,
 
-      CREATE INDEX IF NOT EXISTS consultations_customer_time_idx
-        ON consultations ("customerId", "consultedAt" DESC);
+      `CREATE INDEX IF NOT EXISTS consultations_customer_time_idx
+        ON consultations ("customerId", "consultedAt" DESC)`,
 
-      CREATE INDEX IF NOT EXISTS consultations_consulted_at_idx
-        ON consultations ("consultedAt" DESC);
+      `CREATE INDEX IF NOT EXISTS consultations_consulted_at_idx
+        ON consultations ("consultedAt" DESC)`,
 
-      CREATE TABLE IF NOT EXISTS consultation_revisions (
+      `CREATE TABLE IF NOT EXISTS consultation_revisions (
         id BIGSERIAL PRIMARY KEY,
         "consultationId" BIGINT NOT NULL REFERENCES consultations(id) ON DELETE RESTRICT,
         "revisionNumber" INTEGER NOT NULL,
@@ -82,11 +83,16 @@ export async function initializeDatabase() {
         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT consultation_revisions_unique_number
           UNIQUE ("consultationId", "revisionNumber")
-      );
+      )`,
 
-      CREATE INDEX IF NOT EXISTS consultation_revisions_timeline_idx
+      `CREATE INDEX IF NOT EXISTS consultation_revisions_timeline_idx
         ON consultation_revisions ("consultationId", "revisionNumber" ASC);
-    `);
+    `
+    ];
+
+    for (const statement of statements) {
+      await getSql().query(statement);
+    }
 
     logger.info('Neon schema initialized');
   })();
