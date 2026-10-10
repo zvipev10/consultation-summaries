@@ -1,6 +1,7 @@
 import { query } from '../database/db';
 import {
   Consultation,
+  HandwrittenSummaryImage,
   ConsultationRevision,
   ConsultationWithCustomer,
   Customer
@@ -12,6 +13,13 @@ export interface CreateConsultationInput {
   summary: string;
   topic?: string | null;
   consultedAt: string;
+  handwrittenSummaryImage?: {
+    fileName: string;
+    mimeType: string;
+    base64Data: string;
+    byteSize: number;
+    sha256: string;
+  };
 }
 
 export interface UpdateConsultationInput {
@@ -27,13 +35,40 @@ export async function createConsultation(input: CreateConsultationInput): Promis
        INSERT INTO consultations ("customerId", summary, topic, "consultedAt")
        VALUES ($1, $2, $3, $4)
        RETURNING *
+     ), image AS (
+       INSERT INTO consultation_handwritten_summary_images
+         ("consultationId", "fileName", "mimeType", "base64Data", "byteSize", sha256)
+       SELECT id, $5, $6, $7, $8, $9
+       FROM inserted
+       WHERE $7::TEXT IS NOT NULL
+       RETURNING id, "consultationId", "fileName", "mimeType", "byteSize", sha256, "createdAt"
      ), revision AS (
        INSERT INTO consultation_revisions ("consultationId", "revisionNumber", summary, topic, "consultedAt", "changeNote")
        SELECT id, 1, summary, topic, "consultedAt", 'Initial summary'
        FROM inserted
      )
-     SELECT * FROM inserted`,
-    [input.customerId, input.summary, input.topic ?? null, input.consultedAt]
+     SELECT inserted.*,
+       (SELECT json_build_object(
+          'id', image.id,
+          'consultationId', image."consultationId",
+          'fileName', image."fileName",
+          'mimeType', image."mimeType",
+          'byteSize', image."byteSize",
+          'sha256', image.sha256,
+          'createdAt', image."createdAt"
+        ) FROM image) AS "handwrittenSummaryImage"
+     FROM inserted`,
+    [
+      input.customerId,
+      input.summary,
+      input.topic ?? null,
+      input.consultedAt,
+      input.handwrittenSummaryImage?.fileName ?? null,
+      input.handwrittenSummaryImage?.mimeType ?? null,
+      input.handwrittenSummaryImage?.base64Data ?? null,
+      input.handwrittenSummaryImage?.byteSize ?? null,
+      input.handwrittenSummaryImage?.sha256 ?? null
+    ]
   );
   return rows[0];
 }
@@ -50,9 +85,19 @@ export async function getConsultation(id: number): Promise<ConsultationWithCusto
          'externalCustomerId', cu."externalCustomerId",
          'createdAt', cu."createdAt",
          'updatedAt', cu."updatedAt"
-       ) AS customer
+       ) AS customer,
+       CASE WHEN hs.id IS NULL THEN NULL ELSE json_build_object(
+         'id', hs.id,
+         'consultationId', hs."consultationId",
+         'fileName', hs."fileName",
+         'mimeType', hs."mimeType",
+         'byteSize', hs."byteSize",
+         'sha256', hs.sha256,
+         'createdAt', hs."createdAt"
+       ) END AS "handwrittenSummaryImage"
      FROM consultations c
      JOIN customers cu ON cu.id = c."customerId"
+     LEFT JOIN consultation_handwritten_summary_images hs ON hs."consultationId" = c.id
      WHERE c.id = $1`,
     [id]
   );
@@ -88,9 +133,19 @@ export async function listConsultations(filters: {
          'externalCustomerId', cu."externalCustomerId",
          'createdAt', cu."createdAt",
          'updatedAt', cu."updatedAt"
-       ) AS customer
+       ) AS customer,
+       CASE WHEN hs.id IS NULL THEN NULL ELSE json_build_object(
+         'id', hs.id,
+         'consultationId', hs."consultationId",
+         'fileName', hs."fileName",
+         'mimeType', hs."mimeType",
+         'byteSize', hs."byteSize",
+         'sha256', hs.sha256,
+         'createdAt', hs."createdAt"
+       ) END AS "handwrittenSummaryImage"
      FROM consultations c
      JOIN customers cu ON cu.id = c."customerId"
+     LEFT JOIN consultation_handwritten_summary_images hs ON hs."consultationId" = c.id
      WHERE ($1::BIGINT IS NULL OR c."customerId" = $1)
        AND ($2::TEXT IS NULL OR c.summary ILIKE '%' || $2 || '%' OR c.topic ILIKE '%' || $2 || '%' OR cu."fullName" ILIKE '%' || $2 || '%' OR cu.email ILIKE '%' || $2 || '%' OR cu."externalCustomerId" ILIKE '%' || $2 || '%' OR ($3::TEXT IS NOT NULL AND cu."normalizedPhone" = $3))
        AND ($4::TIMESTAMPTZ IS NULL OR c."consultedAt" >= $4)
@@ -108,6 +163,20 @@ export async function listConsultations(filters: {
     ]
   );
   return rows;
+}
+
+export interface HandwrittenSummaryImageContent extends HandwrittenSummaryImage {
+  base64Data: string;
+}
+
+export async function getHandwrittenSummaryImage(consultationId: number): Promise<HandwrittenSummaryImageContent | null> {
+  const rows = await query<HandwrittenSummaryImageContent>(
+    `SELECT id, "consultationId", "fileName", "mimeType", "base64Data", "byteSize", sha256, "createdAt"
+     FROM consultation_handwritten_summary_images
+     WHERE "consultationId" = $1`,
+    [consultationId]
+  );
+  return rows[0] || null;
 }
 
 export async function updateConsultation(id: number, input: UpdateConsultationInput): Promise<Consultation | null> {

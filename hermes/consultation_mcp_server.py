@@ -8,13 +8,19 @@ Hermes, while this process validates inputs and invokes the protected API.
 from __future__ import annotations
 
 import json
+import base64
+import mimetypes
 import os
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+
+MAX_HANDWRITTEN_IMAGE_BYTES = 3 * 1024 * 1024
+ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_NAME = "consultation-summaries"
@@ -74,6 +80,32 @@ def optional_string(arguments: dict[str, Any], name: str, maximum: int) -> str |
     return value
 
 
+def handwritten_image_from_path(arguments: dict[str, Any]) -> dict[str, Any] | None:
+    raw_path = optional_string(arguments, "handwritten_summary_image_path", 2_000)
+    if not raw_path:
+        return None
+
+    root = Path(os.environ.get("CONSULTATION_SUMMARIES_MEDIA_ROOT", "~/.hermes/image_cache")).expanduser().resolve()
+    path = Path(raw_path).expanduser().resolve()
+    try:
+        path.relative_to(root)
+    except ValueError as error:
+        raise ValueError("handwritten_summary_image_path must be a WhatsApp image attachment") from error
+    if not path.is_file():
+        raise ValueError("The handwritten summary image attachment is no longer available")
+    size = path.stat().st_size
+    if size < 1 or size > MAX_HANDWRITTEN_IMAGE_BYTES:
+        raise ValueError("The handwritten summary image must be 3 MB or smaller")
+    mime_type, _ = mimetypes.guess_type(path.name)
+    if mime_type not in ALLOWED_IMAGE_MIME_TYPES:
+        raise ValueError("The handwritten summary must be a JPEG, PNG, or WebP image")
+    return {
+        "fileName": path.name,
+        "mimeType": mime_type,
+        "base64Data": base64.b64encode(path.read_bytes()).decode("ascii"),
+    }
+
+
 def create_consultation(arguments: dict[str, Any]) -> Any:
     customer = {"fullName": require_string(arguments, "customer_name", 300)}
     for argument_name, api_name, maximum in (
@@ -95,6 +127,9 @@ def create_consultation(arguments: dict[str, Any]) -> Any:
     consulted_at = optional_string(arguments, "consulted_at", 100)
     if consulted_at:
         payload["consultedAt"] = consulted_at
+    image = handwritten_image_from_path(arguments)
+    if image:
+        payload["handwrittenSummaryImage"] = image
     return api_request("POST", "/api/consultations", payload)
 
 
@@ -143,10 +178,11 @@ def update_consultation(arguments: dict[str, Any]) -> Any:
 TOOLS = [
     {
         "name": "create_consultation",
-        "description": "Create a customer consultation record. Use only after the user supplied their name, at least one identifier (phone, email, or customer ID), and the consultation summary. Ask a concise clarification if any required information is missing.",
+        "description": "Create a customer consultation record. Use only after the user supplied their name, at least one identifier (phone, email, or customer ID), and the consultation summary. When the incoming WhatsApp message includes a handwritten-summary image, pass its local attachment path as handwritten_summary_image_path so the original image is saved immutably with this initial consultation. Ask a concise clarification if any required information is missing.",
         "inputSchema": {"type": "object", "properties": {
             "customer_name": {"type": "string"}, "phone": {"type": "string"}, "email": {"type": "string"}, "external_customer_id": {"type": "string"},
-            "summary": {"type": "string"}, "topic": {"type": "string"}, "consulted_at": {"type": "string", "description": "ISO 8601 timestamp; omit to use now."}
+            "summary": {"type": "string"}, "topic": {"type": "string"}, "consulted_at": {"type": "string", "description": "ISO 8601 timestamp; omit to use now."},
+            "handwritten_summary_image_path": {"type": "string", "description": "Absolute local path of the attached WhatsApp handwritten-summary image. Omit when no image was attached."}
         }, "required": ["customer_name", "summary"], "additionalProperties": False},
         "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
     },

@@ -18,6 +18,16 @@ export interface Consultation {
   updatedAt: string;
 }
 
+export interface HandwrittenSummaryImage {
+  id: number;
+  consultationId: number;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+  sha256: string;
+  createdAt: string;
+}
+
 export interface ConsultationRevision {
   id: number;
   consultationId: number;
@@ -31,4 +41,5 @@ export interface ConsultationRevision {
 
 export interface ConsultationWithCustomer extends Consultation {
   customer: Customer;
+  handwrittenSummaryImage: HandwrittenSummaryImage | null;
 }

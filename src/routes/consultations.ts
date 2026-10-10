@@ -1,10 +1,12 @@
 import { Router } from 'express';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { getCustomerById, findOrCreateCustomer } from '../services/customerService';
 import {
   createConsultation,
   getConsultation,
   getConsultationHistory,
+  getHandwrittenSummaryImage,
   listConsultations,
   updateConsultation
 } from '../services/consultationService';
@@ -19,12 +21,26 @@ const customerInput = z.object({
   externalCustomerId: z.string().trim().min(1).max(200).nullable().optional()
 });
 
+const MAX_HANDWRITTEN_IMAGE_BYTES = 3 * 1024 * 1024;
+const base64Image = z.string()
+  .min(4)
+  .max(Math.ceil(MAX_HANDWRITTEN_IMAGE_BYTES / 3) * 4)
+  .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/, 'Invalid base64 image data')
+  .refine((value) => Buffer.from(value, 'base64').length <= MAX_HANDWRITTEN_IMAGE_BYTES, 'Image must be 3 MB or smaller');
+
+const handwrittenSummaryImageInput = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  base64Data: base64Image
+});
+
 const createConsultationInput = z.object({
   customerId: positiveId.optional(),
   customer: customerInput.optional(),
   summary: z.string().trim().min(1).max(100_000),
   topic: z.string().trim().min(1).max(500).nullable().optional(),
-  consultedAt: z.coerce.date().optional()
+  consultedAt: z.coerce.date().optional(),
+  handwrittenSummaryImage: handwrittenSummaryImageInput.optional()
 }).superRefine((value, context) => {
   if (!value.customerId && !value.customer) {
     context.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide customerId or customer details' });
@@ -54,11 +70,21 @@ consultationRouter.post('/', async (req, res, next) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
 
+    const imageBuffer = input.handwrittenSummaryImage
+      ? Buffer.from(input.handwrittenSummaryImage.base64Data, 'base64')
+      : undefined;
     const consultation = await createConsultation({
       customerId: customer.id,
       summary: input.summary,
       topic: input.topic,
-      consultedAt: (input.consultedAt || new Date()).toISOString()
+      consultedAt: (input.consultedAt || new Date()).toISOString(),
+      handwrittenSummaryImage: input.handwrittenSummaryImage && imageBuffer ? {
+        fileName: input.handwrittenSummaryImage.fileName,
+        mimeType: input.handwrittenSummaryImage.mimeType,
+        base64Data: imageBuffer.toString('base64'),
+        byteSize: imageBuffer.length,
+        sha256: createHash('sha256').update(imageBuffer).digest('hex')
+      } : undefined
     });
 
     return res.status(201).json({ consultation: { ...consultation, customer } });
@@ -100,6 +126,20 @@ consultationRouter.get('/:id', async (req, res, next) => {
     const consultation = await getConsultation(id);
     if (!consultation) return res.status(404).json({ error: 'Consultation not found' });
     return res.json({ consultation });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+consultationRouter.get('/:id/handwritten-summary-image', async (req, res, next) => {
+  try {
+    const id = positiveId.parse(req.params.id);
+    const image = await getHandwrittenSummaryImage(id);
+    if (!image) return res.status(404).json({ error: 'Handwritten summary image not found' });
+    res.setHeader('Content-Type', image.mimeType);
+    res.setHeader('Content-Length', image.byteSize);
+    res.setHeader('Content-Disposition', `inline; filename="${image.fileName.replace(/["\\]/g, '_')}"`);
+    return res.send(Buffer.from(image.base64Data, 'base64'));
   } catch (error) {
     return next(error);
   }

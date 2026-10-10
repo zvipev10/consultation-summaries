@@ -42,6 +42,18 @@ X-Hermes-WhatsApp-Group-Id: 120363432180645142@g.us
 }
 ```
 
+To attach the original handwritten summary screenshot to the initial consultation, add `handwrittenSummaryImage`. It is immutable after creation and accepts JPEG, PNG, or WebP up to 3 MB.
+
+```json
+"handwrittenSummaryImage": {
+  "fileName": "handwritten-summary.jpg",
+  "mimeType": "image/jpeg",
+  "base64Data": "...base64-encoded-image..."
+}
+```
+
+Retrieve it through `GET /api/consultations/42/handwritten-summary-image`. The consultation response contains only safe image metadata, never the image bytes.
+
 Use `customerId` instead of `customer` to add another consultation for an existing customer.
 
 ### Search

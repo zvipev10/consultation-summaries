@@ -72,6 +72,17 @@ export async function initializeDatabase() {
       `CREATE INDEX IF NOT EXISTS consultations_consulted_at_idx
         ON consultations ("consultedAt" DESC)`,
 
+      `CREATE TABLE IF NOT EXISTS consultation_handwritten_summary_images (
+        id BIGSERIAL PRIMARY KEY,
+        "consultationId" BIGINT NOT NULL UNIQUE REFERENCES consultations(id) ON DELETE RESTRICT,
+        "fileName" TEXT NOT NULL,
+        "mimeType" TEXT NOT NULL,
+        "base64Data" TEXT NOT NULL,
+        "byteSize" INTEGER NOT NULL CHECK ("byteSize" > 0),
+        sha256 TEXT NOT NULL,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+
       `CREATE TABLE IF NOT EXISTS consultation_revisions (
         id BIGSERIAL PRIMARY KEY,
         "consultationId" BIGINT NOT NULL REFERENCES consultations(id) ON DELETE RESTRICT,
