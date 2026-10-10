@@ -4,7 +4,7 @@ Backend-only API for recording customer consultation summaries, searching them, 
 
 ## Stack
 
-- Node.js 20, TypeScript, Express
+- Node.js 24, TypeScript, Express
 - Neon Postgres via `@neondatabase/serverless`
 - Vercel serverless deployment
 
@@ -27,6 +27,8 @@ Creating with customer details finds the customer by normalized phone, email, or
 ```http
 POST /api/consultations
 Content-Type: application/json
+Authorization: Bearer <HERMES_API_SECRET>
+X-Hermes-WhatsApp-Group-Id: 120363432180645142@g.us
 
 {
   "customer": {
@@ -49,6 +51,11 @@ GET /api/customers/search?query=0501234567
 GET /api/consultations?query=ישראל&from=2026-10-01&to=2026-10-31
 GET /api/consultations?customerId=12
 ```
+
+Every `/api/*` request must include the `Authorization` and
+`X-Hermes-WhatsApp-Group-Id` headers shown above. The API only accepts the
+configured Hermes secret and WhatsApp group ID; `/health` remains public for
+Vercel monitoring.
 
 ### Read a consultation and its history
 
@@ -73,8 +80,16 @@ Content-Type: application/json
 
 ## Deployment
 
-Import the GitHub repository into Vercel and configure `DATABASE_URL` in the Vercel project environment variables. Vercel routes all requests to `api/index.ts`.
+Import the GitHub repository into Vercel and configure these environment variables:
+
+- `DATABASE_URL`
+- `HERMES_ALLOWED_WHATSAPP_GROUP_ID`
+- `HERMES_API_SECRET`
+
+Vercel routes all requests to `api/index.ts`.
 
 ## Current access model
 
-As requested, this first version has no authentication. Do not expose the deployed URL publicly until an access-control approach is added.
+All application endpoints are restricted to Hermes requests originating from
+the configured WhatsApp group. The secret is server-to-server only and must
+never be sent through WhatsApp messages.

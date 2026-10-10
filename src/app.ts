@@ -4,6 +4,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { initializeDatabase } from './database/db';
 import { logger } from './logger';
+import { requireHermesGroup } from './middleware/hermesGroupAccess';
 import { consultationRouter } from './routes/consultations';
 import { customerRouter } from './routes/customers';
 
@@ -32,6 +33,7 @@ app.get('/health', async (_req, res, next) => {
   }
 });
 
+app.use('/api', requireHermesGroup);
 app.use('/api/customers', customerRouter);
 app.use('/api/consultations', consultationRouter);
 
