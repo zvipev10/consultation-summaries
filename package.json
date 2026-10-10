@@ -5,7 +5,7 @@
   "description": "Backend API for customer consultation summaries and immutable revision history.",
   "main": "dist/app.js",
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "scripts": {
     "build": "tsc",
