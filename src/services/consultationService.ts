@@ -5,6 +5,7 @@ import {
   ConsultationWithCustomer,
   Customer
 } from '../types/consultation';
+import { normalizePhone } from './customerService';
 
 export interface CreateConsultationInput {
   customerId: number;
@@ -91,12 +92,20 @@ export async function listConsultations(filters: {
      FROM consultations c
      JOIN customers cu ON cu.id = c."customerId"
      WHERE ($1::BIGINT IS NULL OR c."customerId" = $1)
-       AND ($2::TEXT IS NULL OR c.summary ILIKE '%' || $2 || '%' OR c.topic ILIKE '%' || $2 || '%' OR cu."fullName" ILIKE '%' || $2 || '%' OR cu.email ILIKE '%' || $2 || '%' OR cu."externalCustomerId" ILIKE '%' || $2 || '%')
-       AND ($3::TIMESTAMPTZ IS NULL OR c."consultedAt" >= $3)
-       AND ($4::TIMESTAMPTZ IS NULL OR c."consultedAt" <= $4)
+       AND ($2::TEXT IS NULL OR c.summary ILIKE '%' || $2 || '%' OR c.topic ILIKE '%' || $2 || '%' OR cu."fullName" ILIKE '%' || $2 || '%' OR cu.email ILIKE '%' || $2 || '%' OR cu."externalCustomerId" ILIKE '%' || $2 || '%' OR ($3::TEXT IS NOT NULL AND cu."normalizedPhone" = $3))
+       AND ($4::TIMESTAMPTZ IS NULL OR c."consultedAt" >= $4)
+       AND ($5::TIMESTAMPTZ IS NULL OR c."consultedAt" <= $5)
      ORDER BY c."consultedAt" DESC, c.id DESC
-     LIMIT $5 OFFSET $6`,
-    [filters.customerId ?? null, filters.query?.trim() || null, filters.from ?? null, filters.to ?? null, filters.limit, filters.offset]
+     LIMIT $6 OFFSET $7`,
+    [
+      filters.customerId ?? null,
+      filters.query?.trim() || null,
+      normalizePhone(filters.query),
+      filters.from ?? null,
+      filters.to ?? null,
+      filters.limit,
+      filters.offset
+    ]
   );
   return rows;
 }
