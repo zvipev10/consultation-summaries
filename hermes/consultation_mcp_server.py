@@ -85,12 +85,14 @@ def handwritten_image_from_path(arguments: dict[str, Any]) -> dict[str, Any] | N
     if not raw_path:
         return None
 
-    root = Path(os.environ.get("CONSULTATION_SUMMARIES_MEDIA_ROOT", "~/.hermes/image_cache")).expanduser().resolve()
     path = Path(raw_path).expanduser().resolve()
-    try:
-        path.relative_to(root)
-    except ValueError as error:
-        raise ValueError("handwritten_summary_image_path must be a WhatsApp image attachment") from error
+    configured_roots = os.environ.get(
+        "CONSULTATION_SUMMARIES_MEDIA_ROOTS",
+        "~/.hermes/cache/images,~/.hermes/image_cache",
+    )
+    roots = [Path(value.strip()).expanduser().resolve() for value in configured_roots.split(",") if value.strip()]
+    if not any(_is_relative_to(path, root) for root in roots):
+        raise ValueError("handwritten_summary_image_path must be a WhatsApp image attachment")
     if not path.is_file():
         raise ValueError("The handwritten summary image attachment is no longer available")
     size = path.stat().st_size
@@ -104,6 +106,14 @@ def handwritten_image_from_path(arguments: dict[str, Any]) -> dict[str, Any] | N
         "mimeType": mime_type,
         "base64Data": base64.b64encode(path.read_bytes()).decode("ascii"),
     }
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
 
 
 def create_consultation(arguments: dict[str, Any]) -> Any:
