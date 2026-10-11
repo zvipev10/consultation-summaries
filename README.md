@@ -22,7 +22,7 @@ Set `DATABASE_URL` in `.env` to a Neon pooled Postgres connection string. The sc
 
 ### Create a consultation
 
-Creating with customer details finds the customer by normalized phone, email, or external customer ID when possible; otherwise it creates a new customer.
+Creating with customer details finds the customer by normalized phone, email, or external customer ID when possible; otherwise it creates a new customer. Israeli numbers are stored and returned in local form (for example `0544250186`), whether supplied locally or as `+972`.
 
 ```http
 POST /api/consultations

@@ -198,7 +198,7 @@ TOOLS = [
     },
     {
         "name": "search_consultations",
-        "description": "Search consultation summaries by a customer's name, phone, email, external ID, or customer ID. Use this for requests to find or list consultations.",
+        "description": "Search consultation summaries by a customer's name, phone, email, external ID, or customer ID. Use this for requests to find or list consultations. When the user asks for a phone number, show customer.normalizedPhone exactly as returned (the full local Israeli number, for example 0544250186); never mask it with asterisks.",
         "inputSchema": {"type": "object", "properties": {
             "query": {"type": "string"}, "customer_id": {"type": "integer"}, "from_date": {"type": "string"}, "to_date": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 100}
         }, "additionalProperties": False},
@@ -206,7 +206,7 @@ TOOLS = [
     },
     {
         "name": "get_consultation",
-        "description": "Retrieve one consultation by its ID.",
+        "description": "Retrieve one consultation by its ID. When reporting the customer phone number, show customer.normalizedPhone exactly as returned; do not mask it.",
         "inputSchema": {"type": "object", "properties": {"consultation_id": {"type": "integer", "minimum": 1}}, "required": ["consultation_id"], "additionalProperties": False},
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
     },

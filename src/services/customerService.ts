@@ -11,14 +11,14 @@ export interface CustomerDetails {
 export function normalizePhone(phone?: string | null): string | null {
   if (!phone?.trim()) return null;
 
-  const digits = phone.replace(/[^\d+]/g, '');
-  if (digits.startsWith('+')) return `+${digits.slice(1).replace(/\D/g, '')}`;
+  let numbers = phone.replace(/\D/g, '');
+  if (numbers.startsWith('00')) numbers = numbers.slice(2);
 
-  const numbers = digits.replace(/\D/g, '');
-  if (numbers.startsWith('00')) return `+${numbers.slice(2)}`;
-  if (numbers.startsWith('972')) return `+${numbers}`;
-  if (numbers.startsWith('0')) return `+972${numbers.slice(1)}`;
-  return `+${numbers}`;
+  // Store Israeli numbers in their familiar local form. Besides being clearer
+  // for the users of this Hebrew-facing system, it avoids treating a customer
+  // phone number as an E.164 secret in Hermes' outbound response redactor.
+  if (numbers.startsWith('972')) return `0${numbers.slice(3)}`;
+  return numbers;
 }
 
 function normalizeEmail(email?: string | null) {

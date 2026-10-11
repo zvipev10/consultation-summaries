@@ -45,6 +45,19 @@ export async function initializeDatabase() {
         ON customers ("normalizedPhone")
         WHERE "normalizedPhone" IS NOT NULL`,
 
+      // Migrate existing Israeli E.164 values without touching a record when
+      // its local-form number already belongs to another customer.
+      `UPDATE customers AS customer
+       SET "normalizedPhone" = '0' || SUBSTRING(customer."normalizedPhone" FROM 5),
+           "updatedAt" = CURRENT_TIMESTAMP
+       WHERE customer."normalizedPhone" ~ '^\\+972[0-9]+$'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM customers AS existing
+           WHERE existing.id <> customer.id
+             AND existing."normalizedPhone" = '0' || SUBSTRING(customer."normalizedPhone" FROM 5)
+         )`,
+
       `CREATE UNIQUE INDEX IF NOT EXISTS customers_external_customer_id_unique
         ON customers ("externalCustomerId")
         WHERE "externalCustomerId" IS NOT NULL`,
