@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { getCustomerById, findOrCreateCustomer } from '../services/customerService';
 import {
-  clearAllConsultationRecords,
   createConsultation,
   getConsultation,
   getConsultationHistory,
@@ -104,17 +103,6 @@ consultationRouter.get('/', async (req, res, next) => {
     const offset = z.coerce.number().int().min(0).catch(0).parse(req.query.offset);
     const consultations = await listConsultations({ customerId, query, from, to, limit, offset });
     return res.json({ consultations, count: consultations.length, limit, offset });
-  } catch (error) {
-    return next(error);
-  }
-});
-
-// Temporary maintenance route: it is protected by the Hermes group middleware
-// and is removed immediately after the requested production data reset.
-consultationRouter.delete('/maintenance/all-records', async (_req, res, next) => {
-  try {
-    const deleted = await clearAllConsultationRecords();
-    return res.json({ deleted });
   } catch (error) {
     return next(error);
   }
