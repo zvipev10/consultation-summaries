@@ -226,3 +226,20 @@ export async function getCustomerConsultations(customerId: number): Promise<Cons
     [customerId]
   );
 }
+
+export async function clearAllConsultationRecords() {
+  const counts = await query<{ customers: number; consultations: number; revisions: number; images: number }>(
+    `SELECT
+       (SELECT COUNT(*)::INTEGER FROM customers) AS customers,
+       (SELECT COUNT(*)::INTEGER FROM consultations) AS consultations,
+       (SELECT COUNT(*)::INTEGER FROM consultation_revisions) AS revisions,
+       (SELECT COUNT(*)::INTEGER FROM consultation_handwritten_summary_images) AS images`
+  );
+  await query(`TRUNCATE TABLE
+    consultation_handwritten_summary_images,
+    consultation_revisions,
+    consultations,
+    customers
+    RESTART IDENTITY`);
+  return counts[0];
+}
