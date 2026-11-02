@@ -5,6 +5,7 @@ import { getCustomerById, findOrCreateCustomer } from '../services/customerServi
 import {
   addHandwrittenSummaryImage,
   createConsultation,
+  deleteConsultationRecord,
   getConsultation,
   getConsultationHistory,
   getHandwrittenSummaryImage,
@@ -120,6 +121,18 @@ consultationRouter.post('/:id/handwritten-summary-image', async (req, res, next)
     const saved = await addHandwrittenSummaryImage(id, image);
     if (!saved) return res.status(404).json({ error: 'Consultation not found' });
     return res.status(201).json({ handwrittenSummaryImage: saved });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Temporary protected route for the user-requested deletion. Removed after use.
+consultationRouter.delete('/:id/maintenance-record', async (req, res, next) => {
+  try {
+    const id = positiveId.parse(req.params.id);
+    const deleted = await deleteConsultationRecord(id);
+    if (!deleted) return res.status(404).json({ error: 'Consultation not found' });
+    return res.json({ deleted: true });
   } catch (error) {
     return next(error);
   }
