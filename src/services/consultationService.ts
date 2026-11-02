@@ -22,6 +22,14 @@ export interface CreateConsultationInput {
   };
 }
 
+export interface HandwrittenSummaryImageInput {
+  fileName: string;
+  mimeType: string;
+  base64Data: string;
+  byteSize: number;
+  sha256: string;
+}
+
 export interface UpdateConsultationInput {
   summary?: string;
   topic?: string | null;
@@ -97,7 +105,12 @@ export async function getConsultation(id: number): Promise<ConsultationWithCusto
        ) END AS "handwrittenSummaryImage"
      FROM consultations c
      JOIN customers cu ON cu.id = c."customerId"
-     LEFT JOIN consultation_handwritten_summary_images hs ON hs."consultationId" = c.id
+     LEFT JOIN LATERAL (
+       SELECT * FROM consultation_handwritten_summary_images
+       WHERE "consultationId" = c.id
+       ORDER BY "createdAt" DESC, id DESC
+       LIMIT 1
+     ) hs ON TRUE
      WHERE c.id = $1`,
     [id]
   );
@@ -145,7 +158,12 @@ export async function listConsultations(filters: {
        ) END AS "handwrittenSummaryImage"
      FROM consultations c
      JOIN customers cu ON cu.id = c."customerId"
-     LEFT JOIN consultation_handwritten_summary_images hs ON hs."consultationId" = c.id
+     LEFT JOIN LATERAL (
+       SELECT * FROM consultation_handwritten_summary_images
+       WHERE "consultationId" = c.id
+       ORDER BY "createdAt" DESC, id DESC
+       LIMIT 1
+     ) hs ON TRUE
      WHERE ($1::BIGINT IS NULL OR c."customerId" = $1)
        AND ($2::TEXT IS NULL OR c.summary ILIKE '%' || $2 || '%' OR c.topic ILIKE '%' || $2 || '%' OR cu."fullName" ILIKE '%' || $2 || '%' OR cu.email ILIKE '%' || $2 || '%' OR cu."externalCustomerId" ILIKE '%' || $2 || '%' OR ($3::TEXT IS NOT NULL AND cu."normalizedPhone" = $3))
        AND ($4::TIMESTAMPTZ IS NULL OR c."consultedAt" >= $4)
@@ -173,8 +191,25 @@ export async function getHandwrittenSummaryImage(consultationId: number): Promis
   const rows = await query<HandwrittenSummaryImageContent>(
     `SELECT id, "consultationId", "fileName", "mimeType", "base64Data", "byteSize", sha256, "createdAt"
      FROM consultation_handwritten_summary_images
-     WHERE "consultationId" = $1`,
+     WHERE "consultationId" = $1
+     ORDER BY "createdAt" DESC, id DESC
+     LIMIT 1`,
     [consultationId]
+  );
+  return rows[0] || null;
+}
+
+export async function addHandwrittenSummaryImage(
+  consultationId: number,
+  image: HandwrittenSummaryImageInput
+): Promise<HandwrittenSummaryImage | null> {
+  const rows = await query<HandwrittenSummaryImage>(
+    `INSERT INTO consultation_handwritten_summary_images
+       ("consultationId", "fileName", "mimeType", "base64Data", "byteSize", sha256)
+     SELECT $1, $2, $3, $4, $5, $6
+     WHERE EXISTS (SELECT 1 FROM consultations WHERE id = $1)
+     RETURNING id, "consultationId", "fileName", "mimeType", "byteSize", sha256, "createdAt"`,
+    [consultationId, image.fileName, image.mimeType, image.base64Data, image.byteSize, image.sha256]
   );
   return rows[0] || null;
 }

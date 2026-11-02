@@ -165,6 +165,14 @@ def get_consultation_history(arguments: dict[str, Any]) -> Any:
     return api_request("GET", f"/api/consultations/{int(arguments['consultation_id'])}/history")
 
 
+def add_handwritten_summary_image(arguments: dict[str, Any]) -> Any:
+    consultation_id = int(arguments["consultation_id"])
+    image = handwritten_image_from_path(arguments)
+    if not image:
+        raise ValueError("handwritten_summary_image_path is required")
+    return api_request("POST", f"/api/consultations/{consultation_id}/handwritten-summary-image", image)
+
+
 def update_consultation(arguments: dict[str, Any]) -> Any:
     consultation_id = int(arguments["consultation_id"])
     payload: dict[str, Any] = {}
@@ -214,6 +222,15 @@ TOOLS = [
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
     },
     {
+        "name": "add_handwritten_summary_image",
+        "description": "Append a handwritten-summary image to an existing consultation. Use this when the user sends an image after the consultation was already created. First find the consultation by the customer details if necessary; customer IDs are internal and must never be requested or mentioned. Earlier images remain stored; the newly attached image is presented with the consultation.",
+        "inputSchema": {"type": "object", "properties": {
+            "consultation_id": {"type": "integer", "minimum": 1},
+            "handwritten_summary_image_path": {"type": "string", "description": "Absolute local path of the WhatsApp image attachment."}
+        }, "required": ["consultation_id", "handwritten_summary_image_path"], "additionalProperties": False},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
+    },
+    {
         "name": "update_consultation",
         "description": "Update a consultation. The API preserves an immutable snapshot. Use only when the user clearly identifies the consultation ID and provides the new details; include change_note when the user provides a reason. Never mention internal customer IDs in the WhatsApp response.",
         "inputSchema": {"type": "object", "properties": {
@@ -223,7 +240,7 @@ TOOLS = [
     },
 ]
 
-HANDLERS = {"create_consultation": create_consultation, "search_consultations": search_consultations, "get_consultation": get_consultation, "get_consultation_history": get_consultation_history, "update_consultation": update_consultation}
+HANDLERS = {"create_consultation": create_consultation, "search_consultations": search_consultations, "get_consultation": get_consultation, "get_consultation_history": get_consultation_history, "add_handwritten_summary_image": add_handwritten_summary_image, "update_consultation": update_consultation}
 
 
 def presentation_data(value: Any, *, inside_customer: bool = False) -> Any:

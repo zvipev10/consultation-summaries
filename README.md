@@ -52,7 +52,7 @@ To attach the original handwritten summary screenshot to the initial consultatio
 }
 ```
 
-Retrieve it through `GET /api/consultations/42/handwritten-summary-image`. The consultation response contains only safe image metadata, never the image bytes.
+Retrieve the newest attachment through `GET /api/consultations/42/handwritten-summary-image`. A later image can be appended without editing the consultation via `POST /api/consultations/42/handwritten-summary-image` using the same image object. Earlier images remain stored; the newest is presented with the consultation.
 
 Use `customerId` instead of `customer` to add another consultation for an existing customer.
 

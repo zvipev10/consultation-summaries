@@ -87,7 +87,7 @@ export async function initializeDatabase() {
 
       `CREATE TABLE IF NOT EXISTS consultation_handwritten_summary_images (
         id BIGSERIAL PRIMARY KEY,
-        "consultationId" BIGINT NOT NULL UNIQUE REFERENCES consultations(id) ON DELETE RESTRICT,
+        "consultationId" BIGINT NOT NULL REFERENCES consultations(id) ON DELETE RESTRICT,
         "fileName" TEXT NOT NULL,
         "mimeType" TEXT NOT NULL,
         "base64Data" TEXT NOT NULL,
@@ -95,6 +95,12 @@ export async function initializeDatabase() {
         sha256 TEXT NOT NULL,
         "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
+
+      `ALTER TABLE consultation_handwritten_summary_images
+       DROP CONSTRAINT IF EXISTS "consultation_handwritten_summary_images_consultationId_key"`,
+
+      `CREATE INDEX IF NOT EXISTS consultation_handwritten_summary_images_consultation_time_idx
+        ON consultation_handwritten_summary_images ("consultationId", "createdAt" DESC, id DESC)`,
 
       `CREATE TABLE IF NOT EXISTS consultation_revisions (
         id BIGSERIAL PRIMARY KEY,
