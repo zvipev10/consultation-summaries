@@ -262,12 +262,4 @@ export async function getCustomerConsultations(customerId: number): Promise<Cons
   );
 }
 
-export async function deleteConsultationRecord(id: number): Promise<boolean> {
-  const existing = await query<{ id: number }>('SELECT id FROM consultations WHERE id = $1', [id]);
-  if (!existing[0]) return false;
-  await query('DELETE FROM consultation_handwritten_summary_images WHERE "consultationId" = $1', [id]);
-  await query('DELETE FROM consultation_revisions WHERE "consultationId" = $1', [id]);
-  await query('DELETE FROM consultations WHERE id = $1', [id]);
-  return true;
-}
 
